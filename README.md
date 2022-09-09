@@ -1,17 +1,17 @@
 # How to use Connectware with Fluent Bit and Grafana Loki
 
-This is an example how to configure a Connectware Docker composition 
+This is an example how to configure a Connectware Docker composition
 for use with a Fluent-Bit log shipping to a Grafana Loki instance.
 
 A variant for the Connectware Kubernetes deployment is not part of this document.
 
 ## Objective
 
-The goal is to replace a default per-container json logging with a fast and easy log aggregation 
+The goal is to replace a default per-container json logging with a fast and easy log aggregation
 for Cybus Connectware with low impact on processing, forwarding, visualization and setup effort,
 so that logs can be easier processed (analyzed, correlated, stored).
 
-## Stdout Shortcut
+## Shortcut with stdout
 
 To simply stream the container logs out of the composition:
 - first change the Docker log driver to `fluentd`,
@@ -49,20 +49,20 @@ The above log configuration can be replaced with the fluentd variant:
   logging:
     driver: fluentd
     options:
-      fluentd-address: "tcp://fluentdhost:24224"
+      fluentd-address: localhost:24224
       fluentd-async: "true"
       fluentd-sub-second-precision: "true"
 ```
 
 Start the Connectware with one or more of these replacements
-and see the log output in the running fluent-bit container.
+and see the log output of the running fluent-bit container.
 
 
 ## Centralized Log configuration in Connectware
 
-To simplify the log configuration, a user can utilize
-- extension fields in docker compositions (since version 3.4, [Docker Compose Extension Fields](https://docs.docker.com/compose/compose-file/compose-file-v3/#extension-fields)
-- Yaml anchors and aliases together with the merge key  
+To simplify the log configuration, a user can utilize:
+- extension fields in docker compositions (since version 3.4, [Docker Compose Extension Fields](https://docs.docker.com/compose/compose-file/compose-file-v3/#extension-fields))
+- Yaml anchors and aliases together with the merge key
 
 The extension field is marked with an anchor `logging`:
 ```
@@ -70,7 +70,7 @@ x-logging: &logging
   logging:
     driver: fluentd
     options:
-      fluentd-address: "tcp://fluentdhost:24224"
+      fluentd-address: "localhost:24224"
       fluentd-async: "true"
       fluentd-sub-second-precision: "true"
 ...      
@@ -96,7 +96,7 @@ services:
 ...
 ```
 
-Start the Connectware with the complete replacement 
+Start the Connectware with the complete replacement
 and see all Connectware logs in the running fluent-bit container.
 
 
@@ -104,17 +104,15 @@ and see all Connectware logs in the running fluent-bit container.
 
 ### Quickstart
 
-Using the docker compositions in this production start the solution in 3 lines
-including Connectware:
-
+Using the docker compositions in this project starts the solution with a few lines (including Connectware):
 ```
 docker compose -f docker-compose-loki.yml up -d
-docker compose -f docker-comopose-fluentbit.yml up -d
+docker compose -f docker-compose-fluentbit.yml up -d
 cd connectware && docker compose -f docker-compose_alias_logging_fluentbit.yml
 ```
 
 Open a browser window, visit `http://localhost:3000` for the Grafana Frontend,
-finish the admin setup and select the explorer view.
+finish its admin setup and select the explorer view.
 
 Use a container from the log-label and query the Connectware Logs.
 
@@ -123,8 +121,7 @@ See the [Grafana Loki Example for the Connectware Protocol Mapper Container](./g
 ### Details
 
 To forward the logs to one or many higher-level tools ([Fluent-Bit Outputs](https://docs.fluentbit.io/manual/pipeline/outputs)) 
-like Loki, Elasticsearch, Kafka, InfluxDB and others, the operator needs to configure
-fluent-bit accordingly.
+like Loki, Elasticsearch, Kafka, InfluxDB and others, the operator needs to configure fluent-bit accordingly.
 
 In this example we focus on a lightweight approach with a Grafana Loki instance
 as some "sidecar" composition alongside the running Connectware.
@@ -146,13 +143,11 @@ to connect to Loki.
 
 ## Next steps
 
-The Fluent-Bit instance can easily be configured for further/parallel outputs
-and more complex configuration e.g. for more useful labels.
-See the corresponding documentation.
+The Fluent-Bit instance can be easily configured for further/parallel outputs
+and more complex configuration e.g. for more useful labels (see the corresponding documentation).
 
-The CPU and memory footprint is pretty small, so further measures to tweak
-the setup for production use may be just need for massive load and contraints
-in the environment.
+The CPU and memory footprint is pretty small, so further measures to tweak the setup
+for production use may be just need for massive load and constraints in the environment.
 
 Loki as the log aggregator has many option to work with, especially a retention
 period will be for useful for stable production use. Whether the storage needs
