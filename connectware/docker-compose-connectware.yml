@@ -1,0 +1,286 @@
+version: "2.0"
+networks:
+  cybus:
+    driver: bridge
+    external: false
+    ipam:
+      config:
+      - subnet: ${CYBUS_NETWORK_MASK}
+      driver: default
+services:
+  admin-web-app:
+    hostname: admin-web-app
+    image: registry.cybus.io/cybus/admin-web-app:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+  auth-server:
+    depends_on:
+    - postgresql
+    - system-control-server
+    environment:
+      CYBUS_ADMIN_USER_ENABLED: ${CYBUS_ADMIN_USER_ENABLED}
+      CYBUS_AUTH_PASSWORD_POLICY_RULES: ${CYBUS_AUTH_PASSWORD_POLICY_RULES}
+      CYBUS_INITIAL_ADMIN_USER_PASSWORD: ${CYBUS_INITIAL_ADMIN_USER_PASSWORD}
+      CYBUS_LDAP_ENABLED: ${CYBUS_LDAP_ENABLED}
+      CYBUS_LDAP_ROLES_ATTRIBUTE: ${CYBUS_LDAP_ROLES_ATTRIBUTE}
+      CYBUS_LDAP_SEARCH_BASE: ${CYBUS_LDAP_SEARCH_BASE}
+      CYBUS_LDAP_SEARCH_FILTER: ${CYBUS_LDAP_SEARCH_FILTER}
+      CYBUS_LDAP_URL: ${CYBUS_LDAP_URL}
+      CYBUS_LDAP_USER_RDN: ${CYBUS_LDAP_USER_RDN}
+      NODE_ENV: production
+    hostname: auth-server
+    image: registry.cybus.io/cybus/auth-server:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+  broker:
+    depends_on:
+    - auth-server
+    - system-control-server
+    environment:
+      CYBUS_BROKER_USE_MUTUAL_TLS: ${CYBUS_BROKER_USE_MUTUAL_TLS}
+      MAX_OFFLINE_MESSAGES: 100
+      MAX_ONLINE_MESSAGES: 3000
+      PERSISTENT_CLIENT_EXPIRATION: 1d
+    hostname: broker
+    image: registry.cybus.io/cybus/broker:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+    - brokerData:/vernemq/data
+    - brokerLog:/vernemq/log
+    - brokerEtc:/vernemq/etc
+  connectware:
+    depends_on:
+    - system-control-server
+    hostname: connectware
+    image: registry.cybus.io/cybus/ingress:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    - io.cybus.role=ingress
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    ports:
+    - 1883:1883
+    - 8883:8883
+    - 443:443
+    - 80:80
+    - 4841:4841
+    - 40000-40100:40000-40100
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+  container-manager:
+    depends_on:
+    - auth-server
+    - broker
+    - system-control-server
+    environment:
+      CYBUS_REGISTRY_PASS: ${CYBUS_REGISTRY_PASS}
+      CYBUS_REGISTRY_USER: ${CYBUS_REGISTRY_USER}
+      NODE_ENV: production
+    hostname: container-manager
+    image: registry.cybus.io/cybus/container-manager:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - certs:/connectware_certs
+  doc-server:
+    hostname: doc-server
+    image: registry.cybus.io/cybus/doc-server:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+  ingress-controller:
+    depends_on:
+    - system-control-server
+    environment:
+      CYBUS_ROUTE_TIMEOUT: 30
+      MAX_TCP_CONNECTIONS: 10000
+    hostname: ingress-controller
+    image: registry.cybus.io/cybus/ingress-controller:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+  postgresql:
+    depends_on:
+    - system-control-server
+    environment:
+      NODE_ENV: production
+      POSTGRES_DB: cybus_connectware
+      POSTGRES_USER: cybus-admin
+    hostname: postgresql
+    image: registry.cybus.io/cybus/postgresql:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: always
+    volumes:
+    - postgresql:/var/lib/postgresql/data
+    - certs:/connectware_certs
+  protocol-mapper:
+    depends_on:
+    - broker
+    - system-control-server
+    environment:
+      CYBUS_MQTT_USERNAME: __sys-protocol-mapper
+      NODE_ENV: production
+    hostname: protocol-mapper
+    image: registry.cybus.io/cybus/protocol-mapper:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    privileged: false
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+  service-manager:
+    depends_on:
+    - auth-server
+    - broker
+    - container-manager
+    - system-control-server
+    environment:
+      CYBUS_MQTT_HOST_FROM_SERVICES: connectware
+      CYBUS_STORAGE_DIR: /data
+      CYBUS_USE_SERVICES_GRAPH: "false"
+      NODE_ENV: production
+    hostname: service-manager
+    image: registry.cybus.io/cybus/service-manager:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+    - service-manager:/data
+  system-control-server:
+    environment:
+      CYBUS_REGISTRY_PASS: ${CYBUS_REGISTRY_PASS}
+      GLOBAL_AGENT_HTTP_PROXY: ${CYBUS_PROXY}
+      GLOBAL_AGENT_HTTPS_PROXY: ${CYBUS_PROXY}
+      GLOBAL_AGENT_NO_PROXY: ${CYBUS_NO_PROXY}
+      NODE_ENV: production
+    hostname: system-control-server
+    image: registry.cybus.io/cybus/system-control-server:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+    - systemControlServerData:/data
+  workbench:
+    depends_on:
+    - auth-server
+    - broker
+    environment:
+      CYBUS_WORKBENCH_PROJECTS_ENABLED: ${CYBUS_WORKBENCH_PROJECTS_ENABLED}
+      HTTP_PROXY: ${CYBUS_PROXY}
+      HTTPS_PROXY: ${CYBUS_PROXY}
+      NO_PROXY: ${CYBUS_NO_PROXY}
+      SUPPRESS_NO_CONFIG_WARNING: 1
+    hostname: workbench
+    image: registry.cybus.io/cybus/workbench:1.0.91
+    labels:
+    - io.cybus.connectware=core
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 10m
+    networks:
+    - cybus
+    restart: unless-stopped
+    volumes:
+    - certs:/connectware_certs
+    - workbench:/root/.node-red
+volumes:
+  brokerData: null
+  brokerEtc: null
+  brokerLog: null
+  certs: null
+  postgresql: null
+  service-manager: null
+  systemControlServerData: null
+  workbench: null
