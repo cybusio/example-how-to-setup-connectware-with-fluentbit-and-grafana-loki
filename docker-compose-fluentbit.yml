@@ -1,8 +1,8 @@
-version: "3.7"
-
 services:
   fluent-bit:
-    image: grafana/fluent-bit-plugin-loki:latest
+    # this image is not regularly multi-arch built, use 3.1.1 for amd64 and 3.1.1-arm64 for arm64 platforms
+    # see https://hub.docker.com/r/grafana/fluent-bit-plugin-loki
+    image: grafana/fluent-bit-plugin-loki:3.1.1-arm64
     container_name: fluent-bit
     environment:
       - LOKI_URL=http://loki:3100/loki/api/v1/push
